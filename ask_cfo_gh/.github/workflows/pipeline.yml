@@ -1,0 +1,79 @@
+name: Run Pipeline
+
+on:
+  # Auto-trigger when PDFs are pushed to input/
+  push:
+    paths:
+      - 'input/**.pdf'
+
+  # Manual trigger from GitHub UI or API
+  workflow_dispatch:
+    inputs:
+      skip_stage1:
+        description: 'Skip Stage 1 (page detection)'
+        required: false
+        type: boolean
+        default: false
+
+# Store your OpenAI key as a repo secret:
+#   Settings → Secrets and variables → Actions → New repository secret
+#   Name: OPENAI_API_KEY   Value: sk-...
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: List input PDFs
+        run: |
+          echo "PDFs in input/:"
+          ls -lh input/*.pdf 2>/dev/null || echo "  (none)"
+
+      - name: Run pipeline
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python run_pipeline.py \
+            --input input \
+            --output output \
+            --api-key "$OPENAI_API_KEY" \
+            ${{ inputs.skip_stage1 == true && '--skip-stage1' || '' }}
+
+      - name: List outputs
+        run: |
+          echo "Files in output/:"
+          ls -lh output/ 2>/dev/null || echo "  (none)"
+
+      - name: Upload outputs as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-output-${{ github.run_number }}
+          path: output/
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Summary
+        run: |
+          echo "## Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| File | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|" >> $GITHUB_STEP_SUMMARY
+          for f in output/*; do
+            if [ -f "$f" ]; then
+              size=$(du -h "$f" | cut -f1)
+              echo "| $(basename $f) | $size |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
