@@ -4,3 +4,4 @@
 - [2026-05-05T13:27:10Z] fix: handle null pointer exception
 - [2026-05-05T11:52:35Z] style: apply consistent code formatting
 - [2026-05-05T19:40:31Z] docs: update README with usage examples
+- [2026-05-05T22:44:54Z] style: apply consistent code formatting
